@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -48,7 +49,7 @@ namespace CreateAllNCharWords
 
                 var allWordsCount = (long)Math.Pow(EnglishChars.Length, len);
                 var printIndexer = allWordsCount / Math.Min(allWordsCount, 100);
-                var result = new string[Math.Min((int)allWordsCount, MaxArrayLength)];
+                var result = new List<string>(Math.Min((int)allWordsCount, MaxArrayLength));
 
                 long counter = 0;
                 long cutterLastIndex = MaxArrayLength; // cut array to disk if larger that limitation
@@ -56,13 +57,16 @@ namespace CreateAllNCharWords
                 var engCharIndexBuffer = new Int16[len];
                 for (long i = 0; i < allWordsCount; i++)
                 {
-                    result[counter++ % MaxArrayLength] = WriteWordByIndex(engCharIndexBuffer);
+                    result.Add(WriteWordByIndex(engCharIndexBuffer));
 
                     GotoNextWord(ref engCharIndexBuffer);
 
                     if (counter >= cutterLastIndex)
                     {
-                        SaveToDisk(ref result);
+                        SaveToDisk(result);
+                        result = new List<string>();
+                        GC.SuppressFinalize(result);
+                        GC.Collect(GC.MaxGeneration);
                         cutterLastIndex += MaxArrayLength;
                     }
 
@@ -71,11 +75,14 @@ namespace CreateAllNCharWords
                         Console.Clear();
                         Console.WriteLine($"{counter} / {allWordsCount} Completed.  [{counter * 100 / allWordsCount}%]");
                     }
+
+                    counter++;
                 }
+                SaveToDisk(result);
 
                 Console.Clear();
                 Console.WriteLine($"{allWordsCount} / {allWordsCount} Completed.");
-                SaveToDisk(ref result);
+                SaveToDisk(result);
                 Console.WriteLine("Process Completed Successful.");
                 Console.WriteLine($"Result Path: {ResultSavePath}");
             }
@@ -91,10 +98,9 @@ namespace CreateAllNCharWords
             goto Start;
         }
 
-        private static void SaveToDisk(ref string[] result)
+        private static void SaveToDisk(IList<string> result)
         {
             File.AppendAllLines(ResultSavePath, result);
-            GC.Collect(GC.MaxGeneration);
         }
 
         private static void GotoNextWord(ref Int16[] engCharIndexBuffer)
